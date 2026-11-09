@@ -1,0 +1,26 @@
+# Runs kleach's full quality gate ENTIRELY inside the container, so the host is
+# never touched: lint (ruff), types (mypy), unit tests (pytest), and the real
+# feature e2e (builds a simulated user workspace and deletes inside the container).
+#
+#   docker build -f Dockerfile.test -t kleach-test .
+#
+# Any failing step aborts the build (and fails CI). Docker-resource nuking needs a
+# live daemon and is covered separately by tests/docker-it.sh.
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git findutils gawk grep sed coreutils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml README.md LICENSE ./
+COPY kleach/ ./kleach/
+COPY tests/ ./tests/
+RUN pip install --no-cache-dir -e ".[dev]"
+
+RUN ruff check kleach tests
+RUN mypy kleach
+RUN pytest
+RUN bash tests/e2e.sh
+
+CMD ["bash", "tests/e2e.sh"]

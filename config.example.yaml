@@ -1,0 +1,45 @@
+# kleach configuration - edit and save.
+# Preview with `kleach scan`; delete with `kleach clean --yes`. Deletes are permanent.
+
+# ── Age window ──────────────────────────────────────────────────────────────
+# Anything staler than days+hours is eligible for cleanup.
+age_days: 90
+age_hours: 0
+deep_activity: false   # true = "idle" means newest file ANYWHERE in the tree
+                       # (recursive, exact); false = shallow top-level check (fast)
+
+# ── Per-project cleanup (keeps your source and config, removes dead traces) ──
+scan_roots:            # where your projects live
+  - ~/dev
+project_state: true    # sweep sessions / caches / editor & GUI state of abandoned projects
+content_scan: true     # also match tools that write the project path inside a file
+
+# ── System-wide reclaim (independent of any project) ────────────────────────
+system_deps: false           # remove node_modules/.venv/target… older than age, anywhere below
+system_dep_roots:
+  - ~
+global_cache_dirs:           # cleared wholesale (XDG cache is disposable)
+  - ~/.cache
+pkg_caches: true             # run detected package-manager cache cleaners (npm/pip/pacman…)
+docker_prune: false          # exited containers + unused/dangling images + build cache
+docker_prune_volumes: false  # also unused volumes - DANGER: deletes data
+# Distro package caches need root: run `kleach clean --system` (uses sudo).
+
+# Re-cloneable git clones (clean tree, nothing unpushed, idle) under these roots
+# are removable - you can re-clone them. Keeps anything with local/unpushed work.
+reclaim_clones: false
+clone_roots: []              # e.g. [/opt, /usr/local/src, ~/tools]
+
+# Redundant archives: a foo.zip sitting beside an extracted foo/ is removable.
+dedupe_archives: false
+archive_roots: []            # e.g. [~/Downloads, /opt]
+
+# Surgically remove a project's entry from files SHARED by many projects
+# (text/JSON recent-lists etc.; binary DBs are never touched).
+surgical_shared: false
+
+# ── Advanced (uncomment to override built-in defaults) ──────────────────────
+# preserve_names: []                       # never delete files/dirs with these names
+# artifact_dirs: [node_modules, .venv, target, build, dist, __pycache__]
+# state_search_depth: 5
+# content_scan_roots: [~/.config, ~/.local/share, ~/.local/state, ~/.var/app]

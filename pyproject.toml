@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kleach"
+version = "0.1.0"
+description = "Smart, aggressive cleanup for low-storage devices and projects you've abandoned - deps, caches, tool/IDE/AI sessions, Docker."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["cleanup", "cache", "disk", "janitor", "cleaner", "dependencies"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+yaml = ["pyyaml>=6"]
+dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.8", "pyyaml>=6"]
+
+[project.urls]
+Homepage = "https://github.com/rvzsec/kleach"
+
+[project.scripts]
+kleach = "kleach.cli:main"
+
+[tool.setuptools]
+packages = ["kleach"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E741"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"

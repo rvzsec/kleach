@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Full feature suite, run ENTIRELY in a container. The `RUN bash tests/e2e.sh`
+      # step inside the image fails the build (and this job) if any assertion fails.
+      - name: Feature e2e (in container)
+        run: docker build -f Dockerfile.test -t kleach-test .
+
+      # Real docker integration (live daemon on the runner): creates a labeled
+      # container + volume and asserts kleach removes them. Skips if unusable.
+      - name: Docker integration (live daemon)
+        run: bash tests/docker-it.sh
