@@ -17,6 +17,7 @@ from .planners import (
     plan_docker,
     plan_generic_state,
     plan_junk_files,
+    plan_orphan_stores,
     plan_projects,
     plan_reclaim_clones,
     plan_redundant_archives,
@@ -54,6 +55,8 @@ def _collect(a):
         items += ci
     if not only or only == "junk":
         items += plan_junk_files(c, reg)
+    if not only or only == "orphans":
+        items += plan_orphan_stores(c)
     if (not only or only == "docker") and pstate:
         dockers += plan_docker(c, reg, cutoff, projects)
     if proj_filter:
@@ -304,7 +307,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, help=h)
         sp.add_argument("--age", type=int, help="override idle-days threshold")
         sp.add_argument("--only", choices=["projects", "deps", "clones", "archives",
-                                           "state", "junk", "docker", "global", "pkg"])
+                                           "state", "junk", "orphans", "docker", "global", "pkg"])
         sp.add_argument("--system", action="store_true",
                         help="also run root-scope cleaners (distro package caches, via sudo)")
         sp.add_argument("--project", action="append", metavar="PATH",

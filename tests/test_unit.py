@@ -1,9 +1,13 @@
-"""Unit tests for kleach's pure functions (no filesystem / no side effects)."""
+"""Unit tests for kleach's pure functions (plus a few isolated-filesystem checks)."""
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
-from kleach import core
+import pytest
+
+from kleach import core, planners
 from kleach.config import DEFAULTS
 
 
@@ -139,6 +143,42 @@ def test_is_env_dir_detects_marker_regardless_of_name(tmp_path):
     (venv / "pyvenv.cfg").write_text("home = /usr\n")
     assert core.is_env_dir(venv, ["pyvenv.cfg"]) is True
     assert core.is_env_dir(venv, []) is False        # no markers configured -> never matches
+
+
+@pytest.mark.skipif(not shutil.which("git"), reason="git not installed")
+def test_git_has_tracked_holds_source_but_not_ignored(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "build").mkdir(parents=True)
+    (repo / "node_modules").mkdir()
+    (repo / "build" / "keep.txt").write_text("committed source\n")
+    (repo / ".gitignore").write_text("node_modules/\n")
+    (repo / "node_modules" / "dep.js").write_text("y\n")
+    env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+           "HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+
+    def run(*a):
+        subprocess.run(["git", "-C", str(repo), *a], check=True,
+                       capture_output=True, env=env)
+
+    run("init", "-q")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    run("add", "build/keep.txt", ".gitignore")
+    run("commit", "-qm", "init")
+    assert core.git_has_tracked(repo / "build") is True            # committed -> hold
+    assert core.git_has_tracked(repo / "node_modules") is False    # ignored -> deletable
+    assert core.git_has_tracked(tmp_path / "norepo") is False      # not a repo
+
+
+def test_plan_orphan_stores_only_when_tool_absent(tmp_path):
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / "blob").write_text("x" * 100)
+    absent = {"orphan_stores": {str(store): "no-such-binary-zzz-xyz"}}
+    items = planners.plan_orphan_stores(absent)
+    assert len(items) == 1 and items[0].path == store
+    present = {"orphan_stores": {str(store): "sh"}}   # sh exists -> store is in use
+    assert planners.plan_orphan_stores(present) == []
 
 
 def test_sweep_ok_cache_vs_config():

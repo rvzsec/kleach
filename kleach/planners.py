@@ -14,6 +14,7 @@ from .core import (
     distinct_projects,
     expand,
     git,
+    git_has_tracked,
     is_env_dir,
     mentions,
     path_keys,
@@ -31,6 +32,7 @@ def plan_projects(c, reg, cutoff, projects) -> list:
     items: list = []
     names, rels = set(c["artifact_dirs"]), c["artifact_paths"]
     markers = c.get("env_markers", [])
+    respect_git = c.get("respect_git_tracked", True)
     plist = sorted(projects, key=len, reverse=True)
 
     def owner(path):
@@ -46,6 +48,8 @@ def plan_projects(c, reg, cutoff, projects) -> list:
             for name in list(dn):
                 art = d / name
                 if name in names or is_env_dir(art, markers):
+                    if respect_git and git_has_tracked(art):
+                        continue      # version-controlled source -> keep (and descend)
                     ok, t = sweepable(owner(art), reg, cutoff)
                     if ok:
                         items.append(Item(art, path_size(art), f"artifact in {t} project"))
@@ -64,6 +68,7 @@ def plan_system_deps(c, reg, cutoff, projects) -> list:
         return []
     names, rels = set(c["artifact_dirs"]), c["artifact_paths"]
     markers = c.get("env_markers", [])
+    respect_git = c.get("respect_git_tracked", True)
     plist = sorted(projects, key=len, reverse=True)
 
     def active(path):
@@ -84,6 +89,8 @@ def plan_system_deps(c, reg, cutoff, projects) -> list:
                     if is_art:
                         dn.remove(name)
                     continue
+                if is_art and respect_git and git_has_tracked(full):
+                    continue          # version-controlled source -> keep (and descend)
                 if is_art:
                     try:
                         if full.stat().st_mtime < cutoff:
@@ -316,6 +323,22 @@ def plan_docker(c, reg, cutoff, projects) -> list:
                 refs.append(DockerRef("image", iid, 0, f"docker image {repo}", pp))
                 break
     return refs
+
+
+def plan_orphan_stores(c) -> list:
+    """A regenerable package/build store whose tool is not installed is dead weight.
+    which(tool) failing is the signal; the path being a known store is the scope.
+    Independent of any project (system-wide), and only ever targets re-downloadable
+    caches, so a false positive costs a re-fetch, never data."""
+    items: list = []
+    for raw, binary in (c.get("orphan_stores", {}) or {}).items():
+        if shutil.which(binary):
+            continue
+        p = expand(raw)
+        if p.is_dir() and any(p.iterdir()):
+            items.append(Item(p, path_size(p),
+                              f"orphaned store ({binary} not installed)"))
+    return items
 
 
 def plan_junk_files(c, reg) -> list:

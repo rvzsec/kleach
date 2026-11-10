@@ -185,6 +185,16 @@ def git(d, *args, timeout=15):
         return None
 
 
+def git_has_tracked(path: Path) -> bool:
+    """True if the directory contains files tracked by git (version-controlled
+    source), so it must not be deleted even when its name matches a build/artifact
+    pattern. False when the dir is untracked, git-ignored, or not inside a repo at
+    all - which keeps node_modules and friends deletable while holding a committed
+    build/. Path-based, no name or tool knowledge."""
+    r = git(path, "ls-files")
+    return bool(r and r.returncode == 0 and r.stdout.strip())
+
+
 # ---- project model ----------------------------------------------------------
 def tier_of(path: Path, reg) -> str:
     s = str(path)

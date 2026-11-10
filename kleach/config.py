@@ -26,6 +26,14 @@ DEFAULTS: dict = {
     ],
     "artifact_paths": ["target/debug", "target/release"],
     "env_markers": ["pyvenv.cfg"],        # a dir holding one of these is a rebuildable env
+    "respect_git_tracked": True,          # never delete a dir that holds git-tracked source
+    "orphan_stores": {                    # a regenerable store whose tool is not installed is dead
+        "~/.local/share/pnpm/store": "pnpm",
+        "~/.pnpm-store": "pnpm",
+        "~/.cache/yarn": "yarn",
+        "~/.cache/go-build": "go",
+        "~/.cargo/registry": "cargo",
+    },
     "system_deps": False,
     "system_dep_roots": ["~"],
     "reclaim_clones": False,
@@ -98,6 +106,22 @@ scan_roots:            # where your projects live
   - ~/dev
 project_state: true    # sweep sessions / caches / editor & GUI state of abandoned projects
 content_scan: true     # also match tools that write the project path inside a file
+
+# ── Safety: never delete version-controlled source ──────────────────────────
+respect_git_tracked: true    # a dir holding git-tracked files is kept even if its
+                             # name matches an artifact (a committed build/ stays; an
+                             # ignored/untracked node_modules is still removed)
+
+# ── Orphaned stores: a regenerable cache whose tool is uninstalled is dead ───
+# which(tool) fails -> the store is swept. Everything here is re-downloadable, so a
+# false positive (tool present via a wrapper like mvnw, or a minimal cron PATH) costs
+# only a re-download, never data. Edit the map or set it to {} to disable.
+orphan_stores:
+  ~/.local/share/pnpm/store: pnpm
+  ~/.pnpm-store: pnpm
+  ~/.cache/yarn: yarn
+  ~/.cache/go-build: go
+  ~/.cargo/registry: cargo
 
 # ── System-wide reclaim (independent of any project) ────────────────────────
 system_deps: false           # remove node_modules/.venv/target… older than age, anywhere below
