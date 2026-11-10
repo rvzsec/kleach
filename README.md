@@ -10,9 +10,11 @@
 
 > ⚠️ **WARNING - kleach deletes permanently.** It is built to wipe *everything* a
 > dead project left scattered across your system - including state that can never be
-> regenerated (AI sessions, editor history, caches, Docker layers). There is no undo.
-> Run `kleach scan` first, keep what matters with `kleach keep`, and only then
-> `kleach clean --yes`.
+> regenerated (AI sessions, editor history, caches, Docker layers). There is no undo,
+> and by design there is no quarantine, trash, or restore step - when kleach deletes,
+> the data is gone immediately. You are responsible for what you remove, so always run
+> `kleach scan` first and double-check exactly what is listed, keep what matters with
+> `kleach keep`, and only then `kleach clean --yes`.
 
 ---
 
@@ -61,6 +63,15 @@ kleach setup            # writes an editable ~/.config/kleach/config.yaml
 
 Everything is tunable in `config.yaml` - scan roots, idle threshold, aggressiveness,
 and what counts as cache vs config.
+
+## Disclaimer
+
+kleach is intentionally aggressive. It has no quarantine, no trash bin, and no restore
+option by design - a deletion is immediate and final. Always preview with `kleach scan`
+and verify what will be removed before running `kleach clean --yes`; you alone decide
+what gets deleted. The software is provided "as is", without warranty of any kind, and
+the author is not responsible or liable for any loss of files or data arising from its
+use (see the [MIT License](LICENSE)).
 
 ## Credits
 

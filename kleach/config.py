@@ -25,6 +25,7 @@ DEFAULTS: dict = {
         ".svelte-kit", ".parcel-cache", ".turbo", ".gradle", "coverage", ".cache",
     ],
     "artifact_paths": ["target/debug", "target/release"],
+    "env_markers": ["pyvenv.cfg"],        # a dir holding one of these is a rebuildable env
     "system_deps": False,
     "system_dep_roots": ["~"],
     "reclaim_clones": False,
@@ -125,6 +126,7 @@ surgical_shared: false
 # ── Advanced (uncomment to override built-in defaults) ──────────────────────
 # preserve_names: []                       # never delete files/dirs with these names
 # artifact_dirs: [node_modules, .venv, target, build, dist, __pycache__]
+# env_markers: [pyvenv.cfg]                 # a dir holding one of these is a rebuildable env, any name
 # state_search_depth: 5
 # content_scan_roots: [~/.config, ~/.local/share, ~/.local/state, ~/.var/app]
 """

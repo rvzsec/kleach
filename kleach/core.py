@@ -110,18 +110,63 @@ def archive_base(name: str):
     return None
 
 
-def path_keys(path_str: str):
-    """Name encodings and hashes a tool might use to key per-project state."""
+def name_keys(path_str: str):
+    """Flattened single-name encodings a tool might use to key per-project state,
+    each paired with the path separator that encoding uses. The separator lets a
+    caller boundary-match a sub-path (key + sep + subpath) to its project while a
+    sibling that merely shares a name prefix stays unmatched."""
     p = path_str.rstrip("/")
-    names = {p, p.lstrip("/"), p.replace("/", "-"), "-" + p.lstrip("/").replace("/", "-"),
-             p.replace("/", "%2F"), "file://" + p}
-    names = {n for n in names if len(n) >= 12}
+    bare = p.lstrip("/")
+    pairs = [(p, "/"), (bare, "/"), (p.replace("/", "-"), "-"),
+             ("-" + bare.replace("/", "-"), "-"), (p.replace("/", "%2F"), "%2F"),
+             ("file://" + p, "/")]
+    out: dict[str, str] = {}
+    for key, sep in pairs:
+        if len(key) >= 12:
+            out.setdefault(key, sep)
+    return list(out.items())
+
+
+def path_keys(path_str: str):
+    """Flattened name keys and path hashes a tool might use to key per-project state."""
+    names = {k for k, _ in name_keys(path_str)}
+    p = path_str.rstrip("/")
     hashes = set()
     for form in (p, p + "/", "file://" + p):
         b = form.encode()
         for algo in (hashlib.md5, hashlib.sha1, hashlib.sha256):
             hashes.add(algo(b).hexdigest())
     return names, hashes
+
+
+def state_matcher(projects):
+    """Resolve a flattened state name to its owning project by boundary-aware
+    longest-prefix match. A name belongs to a project when it equals an encoded
+    key, or begins with that key followed by the encoding's own separator; the
+    longest (most specific) key wins. Purely path-based, no tool knowledge.
+
+    Flattening that collapses '/' to '-' is lossy, so a dash-encoded name cannot
+    be told apart from a literal-hyphen sibling (proj/sub vs proj-sub). That is
+    inherent to the encoding, not special-cased: longest-match lets a more
+    specific project reclaim its own key, and any residue is swept with the
+    parent, consistent with the rest of kleach."""
+    keyed = []
+    for proj in projects:
+        for key, sep in name_keys(proj):
+            keyed.append((key, sep, proj))
+    keyed.sort(key=lambda t: len(t[0]), reverse=True)   # most specific wins
+    buckets: dict = {}
+    for entry in keyed:
+        buckets.setdefault(entry[0][:8], []).append(entry)   # keys are >= 12 chars
+
+    def match(name):
+        if len(name) < 12:
+            return None
+        for key, sep, proj in buckets.get(name[:8], ()):
+            if name == key or (name.startswith(key) and name[len(key):].startswith(sep)):
+                return proj
+        return None
+    return match
 
 
 def distinct_projects(paths) -> set:
@@ -204,6 +249,13 @@ def sweepable(proj: str, reg, cutoff: float):
     if t == "short":
         return True, t
     return project_last_active(proj) < cutoff, t
+
+
+def is_env_dir(path: Path, markers) -> bool:
+    """True if the directory holds a defining marker file (e.g. pyvenv.cfg for a
+    Python virtual environment), identifying it as a rebuildable environment
+    regardless of what it is named. Path-based, no tool or name knowledge."""
+    return any((path / m).is_file() for m in markers)
 
 
 def discover_projects(c) -> set:

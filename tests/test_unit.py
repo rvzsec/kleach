@@ -39,6 +39,34 @@ def test_path_keys_encodings_and_hashes():
     assert hashlib.md5(b"/home/u/dev/proj").hexdigest() in hashes
 
 
+def test_name_keys_pairs_carry_their_separator():
+    pairs = dict(core.name_keys("/home/u/dev/proj"))
+    assert pairs["-home-u-dev-proj"] == "-"
+    assert pairs["%2Fhome%2Fu%2Fdev%2Fproj"] == "%2F"
+    assert pairs["file:///home/u/dev/proj"] == "/"
+
+
+def test_state_matcher_exact_and_subfolder_longest_wins():
+    m = core.state_matcher(["/home/u/dev/proj", "/home/u/dev/proj/frontend"])
+    assert m("-home-u-dev-proj") == "/home/u/dev/proj"
+    # a subfolder that is itself a project -> most specific key wins
+    assert m("-home-u-dev-proj-frontend") == "/home/u/dev/proj/frontend"
+    # deeper state under that subfolder -> nearest project via boundary prefix
+    assert m("-home-u-dev-proj-frontend-dist") == "/home/u/dev/proj/frontend"
+    # the %2F encoding boundary-matches too
+    assert m("%2Fhome%2Fu%2Fdev%2Fproj%2Fbuild") == "/home/u/dev/proj"
+
+
+def test_state_matcher_sibling_boundary_and_dash_ambiguity():
+    m = core.state_matcher(["/home/u/dev/proj"])
+    # sibling sharing only a name-stem prefix: next char is not the separator -> no match
+    assert m("-home-u-dev-proj2") is None
+    # inherent dash lossiness: proj-backup is indistinguishable from proj/backup
+    assert m("-home-u-dev-proj-backup") == "/home/u/dev/proj"
+    # too short to be any key
+    assert m("short") is None
+
+
 def test_to_bytes():
     assert core.to_bytes("1.5GB") == int(1.5 * 1024 ** 3)
     assert core.to_bytes("512MB") == 512 * 1024 ** 2
@@ -102,6 +130,15 @@ def test_strip_projects_text_lines_boundary():
     new = core.strip_projects(text, ["/a/app"])
     assert "/a/app2" in new          # sibling line kept (boundary)
     assert "open /a/app here" not in new
+
+
+def test_is_env_dir_detects_marker_regardless_of_name(tmp_path):
+    venv = tmp_path / "myenv"             # a venv named outside the known set
+    venv.mkdir()
+    assert core.is_env_dir(venv, ["pyvenv.cfg"]) is False
+    (venv / "pyvenv.cfg").write_text("home = /usr\n")
+    assert core.is_env_dir(venv, ["pyvenv.cfg"]) is True
+    assert core.is_env_dir(venv, []) is False        # no markers configured -> never matches
 
 
 def test_sweep_ok_cache_vs_config():

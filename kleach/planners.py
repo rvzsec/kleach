@@ -14,11 +14,13 @@ from .core import (
     distinct_projects,
     expand,
     git,
+    is_env_dir,
     mentions,
     path_keys,
     path_size,
     project_last_active,
     search_roots,
+    state_matcher,
     sweep_ok,
     sweepable,
     under_long,
@@ -28,6 +30,7 @@ from .core import (
 def plan_projects(c, reg, cutoff, projects) -> list:
     items: list = []
     names, rels = set(c["artifact_dirs"]), c["artifact_paths"]
+    markers = c.get("env_markers", [])
     plist = sorted(projects, key=len, reverse=True)
 
     def owner(path):
@@ -41,8 +44,8 @@ def plan_projects(c, reg, cutoff, projects) -> list:
         for dp, dn, _fn in os.walk(root):
             d = Path(dp)
             for name in list(dn):
-                if name in names:
-                    art = d / name
+                art = d / name
+                if name in names or is_env_dir(art, markers):
                     ok, t = sweepable(owner(art), reg, cutoff)
                     if ok:
                         items.append(Item(art, path_size(art), f"artifact in {t} project"))
@@ -60,6 +63,7 @@ def plan_system_deps(c, reg, cutoff, projects) -> list:
     if not c.get("system_deps"):
         return []
     names, rels = set(c["artifact_dirs"]), c["artifact_paths"]
+    markers = c.get("env_markers", [])
     plist = sorted(projects, key=len, reverse=True)
 
     def active(path):
@@ -75,11 +79,12 @@ def plan_system_deps(c, reg, cutoff, projects) -> list:
             d = Path(dp)
             for name in list(dn):
                 full = d / name
+                is_art = name in names or is_env_dir(full, markers)
                 if under_long(full, reg) or active(full):
-                    if name in names:
+                    if is_art:
                         dn.remove(name)
                     continue
-                if name in names:
+                if is_art:
                     try:
                         if full.stat().st_mtime < cutoff:
                             items.append(Item(full, path_size(full), "stale rebuildable deps"))
@@ -160,12 +165,10 @@ def plan_redundant_archives(c, reg) -> list:
 
 def plan_generic_state(c, reg, cutoff, projects) -> list:
     preserve = set(c.get("preserve_names", []))
-    exact: dict = {}
+    match = state_matcher(projects)
     hashes: list = []
     for proj in projects:
-        nkeys, hkeys = path_keys(proj)
-        for k in nkeys:
-            exact.setdefault(k, proj)
+        _, hkeys = path_keys(proj)
         for h in hkeys:
             hashes.append((h, proj))
     items, seen = [], set()
@@ -178,7 +181,7 @@ def plan_generic_state(c, reg, cutoff, projects) -> list:
             for name in list(dn) + fn:
                 if name in preserve:
                     continue
-                proj = exact.get(name)
+                proj = match(name)
                 if proj is None:
                     for h, pr in hashes:
                         if h in name:
